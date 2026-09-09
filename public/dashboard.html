@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — RSUD Meuraxa SIMRS</title>
+    <meta name="description" content="Ringkasan statistik harian SIMRS RSUD Meuraxa">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00c9a7">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/app.css" rel="stylesheet">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+    <!-- ── Stat Cards ─────────────────────────────────────────────────────── -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h4 fw-bold mb-1">Dashboard</h1>
+            <p class="text-secondary mb-0" style="font-size:0.88rem;">Ringkasan statistik harian SIMRS RSUD Meuraxa</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnRefreshDash" title="Perbarui data">
+            <i class="bi bi-arrow-clockwise" id="dashRefreshIcon"></i>
+        </button>
+    </div>
+
+    <!-- Stat Cards Grid -->
+    <div class="row g-3 mb-4" id="statCards">
+        <!-- Injected by JS -->
+        <div class="col-12 text-center py-5 text-secondary" id="statsLoading">
+            <div class="spinner-border spinner-border-sm me-2"></div> Memuat statistik…
+        </div>
+    </div>
+
+    <!-- Recent Visits -->
+    <div class="glass-card">
+        <div class="card-header-custom">
+            <h5><i class="bi bi-activity me-2"></i>5 Kunjungan Terakhir</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark-custom table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pasien</th>
+                            <th>Dokter</th>
+                            <th>Waktu</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelRecent">
+                        <tr>
+                            <td colspan="3" class="text-center text-secondary py-4">
+                                <div class="spinner-border spinner-border-sm me-2"></div>Memuat…
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /#appShell -->
+
+<div id="toastHost" class="toast-host"></div>
+<script src="js/app.js"></script>
+<script src="js/sync.js"></script>
+<script>
+(async function DashboardPage() {
+    'use strict';
+
+    const user = await App.requireAuth();
+    if (!user) return;
+    App.renderSidebar('dashboard.html');
+
+    // ── Stat card definitions ─────────────────────────────────────────────────
+    const CARDS = [
+        { key: 'total_pasien',       icon: 'bi-people',       label: 'Total Pasien',       color: '#00c9a7' },
+        { key: 'total_kunjungan',    icon: 'bi-clipboard2-pulse', label: 'Total Kunjungan',    color: '#3b82f6' },
+        { key: 'kunjungan_hari_ini', icon: 'bi-calendar-check',  label: 'Kunjungan Hari Ini', color: '#8b5cf6' },
+        { key: 'total_obat',         icon: 'bi-capsule',      label: 'Jenis Obat',         color: '#f59e0b' },
+        { key: 'total_audit',        icon: 'bi-shield-check', label: 'Log Audit',          color: '#10b981' },
+    ];
+
+    async function loadDashboard() {
+        document.getElementById('dashRefreshIcon')?.classList.add('spin');
+
+        try {
+            const res  = await App.apiFetch('/dashboard');
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Error');
+
+            // ── Render stat cards ─────────────────────────────────────────────
+            const grid = document.getElementById('statCards');
+            grid.innerHTML = CARDS.map(c => `
+            <div class="col-6 col-md-4 col-lg">
+                <div class="stat-card" style="border-top: 3px solid ${c.color};">
+                    <div class="icon-box" style="background: ${c.color}22; color: ${c.color};">
+                        <i class="bi ${c.icon}"></i>
+                    </div>
+                    <div class="stat-value" style="font-size:2rem;font-weight:800;color:${c.color};line-height:1;">
+                        ${Number(data.stats[c.key] ?? 0).toLocaleString('id-ID')}
+                    </div>
+                    <div class="stat-label text-secondary mt-1" style="font-size:0.8rem;font-weight:600;">
+                        ${c.label}
+                    </div>
+                </div>
+            </div>`).join('');
+
+            // ── Render recent visits ──────────────────────────────────────────
+            const tbody = document.getElementById('tabelRecent');
+            const visits = data.recent_visits || [];
+
+            if (!visits.length) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-4">Belum ada kunjungan.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = visits.map(v => {
+                const waktu = v.waktu
+                    ? new Date(v.waktu).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+                    : '-';
+                return `<tr>
+                    <td><div class="fw-semibold">${escHtml(v.nama_pasien || '-')}</div></td>
+                    <td class="text-secondary" style="font-size:0.85rem;">${escHtml(v.nama_dokter || '-')}</td>
+                    <td style="font-size:0.82rem;white-space:nowrap;">${waktu}</td>
+                </tr>`;
+            }).join('');
+
+        } catch (err) {
+            const grid = document.getElementById('statCards');
+            grid.innerHTML = `<div class="col-12">
+                <div class="alert-simrs danger">
+                    <i class="bi bi-wifi-off me-1"></i>
+                    Tidak dapat memuat data dashboard. ${navigator.onLine ? 'Periksa koneksi server.' : 'Mode offline.'}
+                </div>
+            </div>`;
+        } finally {
+            document.getElementById('dashRefreshIcon')?.classList.remove('spin');
+        }
+    }
+
+    document.getElementById('btnRefreshDash')?.addEventListener('click', loadDashboard);
+    await loadDashboard();
+})();
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

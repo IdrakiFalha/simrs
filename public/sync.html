@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pelacakan Sinkronisasi — RSUD Meuraxa SIMRS</title>
+    <meta name="description" content="Status sinkronisasi data antrean offline ke server SATUSEHAT.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00c9a7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/app.css" rel="stylesheet">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h4 fw-bold mb-1">Pelacakan Sinkronisasi (Offline)</h1>
+            <p class="text-secondary mb-0" style="font-size:0.88rem;">
+                Daftar antrean data lokal yang menunggu untuk diunggah ke server.
+            </p>
+        </div>
+        <div>
+            <button class="btn btn-accent fw-bold" type="button" id="btnSyncNow">
+                <i class="bi bi-arrow-repeat me-2"></i> Sinkronkan Sekarang
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Antrean Admisi -->
+        <div class="col-12">
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h5><i class="bi bi-person-lines-fill me-2"></i>Antrean Pendaftaran (Admisi)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark-custom table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID Lokal</th>
+                                    <th>NIK / Nama</th>
+                                    <th>Tanggal Lahir</th>
+                                    <th>Status</th>
+                                    <th>Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelSyncAdmisi">
+                                <tr><td colspan="5" class="text-center text-muted py-4">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Antrean Klinis -->
+        <div class="col-12">
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h5><i class="bi bi-journal-medical me-2"></i>Antrean Pemeriksaan (Klinis)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark-custom table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID Lokal</th>
+                                    <th>ID Pasien</th>
+                                    <th>ICD-10 & Keluhan</th>
+                                    <th>Resep Obat</th>
+                                    <th>Status</th>
+                                    <th>Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelSyncKlinis">
+                                <tr><td colspan="6" class="text-center text-muted py-4">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /#appShell -->
+
+<div id="toastHost" class="toast-host"></div>
+<script src="js/app.js"></script>
+<script src="js/sync.js"></script>
+<script>
+(async function SyncPage() {
+    'use strict';
+
+    const user = await App.requireAuth();
+    if (!user) return;
+    App.renderSidebar('sync.html');
+
+    const tblAdmisi = document.getElementById('tabelSyncAdmisi');
+    const tblKlinis = document.getElementById('tabelSyncKlinis');
+    const btnSync = document.getElementById('btnSyncNow');
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function loadTables() {
+        // Load Admisi
+        const admisi = await LocalDB.getAdmisi();
+        if (admisi.length === 0) {
+            tblAdmisi.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Tidak ada antrean pendaftaran.</td></tr>`;
+        } else {
+            tblAdmisi.innerHTML = admisi.map(item => {
+                const statusBadge = item.sync_error 
+                    ? `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i> Gagal: ${esc(item.sync_error)}</span>`
+                    : `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass me-1"></i> Menunggu Sinyal</span>`;
+                
+                return `<tr>
+                    <td>#${item.id}</td>
+                    <td><div class="fw-bold">${esc(item.nik)}</div><small class="text-muted">${esc(item.nama)}</small></td>
+                    <td>${esc(item.tanggal_lahir)}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-outline-danger btn-sm js-del-admisi" data-id="${item.id}" title="Hapus Data"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Load Klinis
+        const klinis = await LocalDB.getKlinis();
+        if (klinis.length === 0) {
+            tblKlinis.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada antrean pemeriksaan.</td></tr>`;
+        } else {
+            tblKlinis.innerHTML = klinis.map(item => {
+                const statusBadge = item.sync_error 
+                    ? `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i> Gagal: ${esc(item.sync_error)}</span>`
+                    : `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass me-1"></i> Menunggu Sinyal</span>`;
+                
+                const resepCount = item.resep && Array.isArray(item.resep) ? item.resep.length : 0;
+
+                return `<tr>
+                    <td>#${item.id}</td>
+                    <td>ID Pasien: ${esc(item.pasien_id)}</td>
+                    <td><div class="fw-bold text-accent">${esc(item.diagnosa_icd10)}</div><small class="text-muted text-truncate d-inline-block" style="max-width:200px;">${esc(item.keluhan)}</small></td>
+                    <td>${resepCount} jenis obat</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-outline-danger btn-sm js-del-klinis" data-id="${item.id}" title="Hapus Data"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Wire up delete buttons
+        document.querySelectorAll('.js-del-admisi').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if (confirm('Yakin ingin menghapus antrean admisi ini? Data akan hilang permanen.')) {
+                    await LocalDB.delAdmisi(parseInt(e.currentTarget.dataset.id));
+                    await SyncManager.updateQueueUI();
+                    loadTables();
+                }
+            });
+        });
+
+        document.querySelectorAll('.js-del-klinis').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if (confirm('Yakin ingin menghapus antrean klinis ini? Data akan hilang permanen.')) {
+                    await LocalDB.delKlinis(parseInt(e.currentTarget.dataset.id));
+                    await SyncManager.updateQueueUI();
+                    loadTables();
+                }
+            });
+        });
+    }
+
+    // Expose render function for SyncManager
+    window.renderSyncTables = loadTables;
+
+    btnSync.addEventListener('click', async () => {
+        const i = btnSync.querySelector('i');
+        i.classList.add('spin');
+        btnSync.disabled = true;
+        
+        await SyncManager.syncDataLocal();
+        await loadTables();
+        
+        btnSync.disabled = false;
+        i.classList.remove('spin');
+    });
+
+    // Initial Load
+    await loadTables();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admisi & Master Pasien — RSUD Meuraxa SIMRS</title>
+    <meta name="description" content="Pendaftaran pasien dan pengelolaan persetujuan sharing data SATUSEHAT Permenkes 24/2022">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00c9a7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/app.css" rel="stylesheet">
+</head>
+<body class="app-body">
+
+<!--
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  #appShell — App.renderSidebar() will inject sidebar + topbar AROUND   │
+  │  the content that's inside this div (prepend + append pattern).         │
+  └──────────────────────────────────────────────────────────────────────────┘
+-->
+<div class="app-shell" id="appShell">
+
+    <!-- ── Page Content (inside app-content injected by renderSidebar) ─── -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h4 fw-bold mb-1">Admisi &amp; Master Pasien</h1>
+            <p class="text-secondary mb-0" style="font-size:0.88rem;">
+                Pendaftaran Pasien &amp; Pengelolaan Persetujuan Sharing Data SATUSEHAT (Permenkes 24/2022).
+            </p>
+        </div>
+        <!-- Offline queue badge — shown when there are pending records -->
+        <div id="offlineBadge" class="d-none">
+            <span class="badge bg-warning text-dark">
+                <i class="bi bi-clock-history me-1"></i>
+                <span id="offlineCount">0</span> antrian offline
+            </span>
+        </div>
+    </div>
+
+    <!-- ── Inline Alert (toast fallback) ───────────────────────────────── -->
+    <div id="pageAlert" class="d-none mb-3"></div>
+
+    <div class="row g-4">
+        <!-- ══ ATAS: Form Registrasi ══════════════════════════════════ -->
+        <div class="col-lg-5">
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h5><i class="bi bi-person-plus me-2"></i>Registrasi Pasien</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form id="formAdmisi" novalidate>
+                        <!-- NIK -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="nik">Nomor Induk Kependudukan (NIK)</label>
+                            <input class="form-control form-control-lg" id="nik" name="nik" maxlength="16"
+                                   required placeholder="16 digit NIK" inputmode="numeric">
+                            <div class="form-text text-secondary">
+                                <span id="nikCount">0</span>/16 digit
+                            </div>
+                            <div class="invalid-feedback" id="nikError"></div>
+                        </div>
+
+                        <!-- Nama -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="nama">Nama Lengkap Pasien</label>
+                            <input class="form-control form-control-lg" id="nama" name="nama"
+                                   required maxlength="100" placeholder="Nama sesuai KTP">
+                            <div class="invalid-feedback" id="namaError"></div>
+                        </div>
+
+                        <!-- Jenis Kelamin & Tanggal Lahir -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="jenis_kelamin">Jenis Kelamin</label>
+                                <select class="form-select form-select-lg" id="jenis_kelamin" name="jenis_kelamin">
+                                    <option value="L">Laki-laki</option>
+                                    <option value="P">Perempuan</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="tanggal_lahir">Tanggal Lahir</label>
+                                <input class="form-control form-control-lg" type="date" id="tanggal_lahir"
+                                       name="tanggal_lahir" required>
+                            </div>
+                        </div>
+
+
+
+                        <!-- Submit Button -->
+                        <button class="btn btn-accent btn-lg w-100 fw-bold" type="submit" id="btnDaftarkan" style="padding: 1rem;">
+                            <i class="bi bi-person-check me-2"></i>
+                            <span id="btnDaftarText">DAFTARKAN PASIEN</span>
+                        </button>
+
+                        <!-- Offline mode indicator -->
+                        <p id="offlineModeNotice" class="text-center text-warning mt-2 d-none" style="font-size:0.8rem;">
+                            <i class="bi bi-wifi-off me-1"></i>
+                            Mode offline — data akan disimpan lokal dan dikirim saat online.
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ BAWAH: Daftar Pasien ════════════════════════════════════ -->
+        <div class="col-lg-7">
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h5><i class="bi bi-people me-2"></i>Daftar Pasien</h5>
+                    <!-- Search bar -->
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group input-group-sm" style="max-width:240px;">
+                            <input class="form-control form-control-sm" id="searchInput"
+                                   placeholder="Cari NIK / nama…" autocomplete="off">
+                            <button class="btn btn-outline-accent btn-sm" id="btnSearch" type="button">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-ghost btn-sm" id="btnRefresh" title="Muat ulang data">
+                            <i class="bi bi-arrow-clockwise" id="refreshIcon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark-custom table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>NIK</th>
+                                    <th>Nama / Info</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelPasien">
+                                <!-- Rows injected by JS -->
+                                <tr id="rowLoading">
+                                    <td colspan="3" class="text-center py-5 text-secondary">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                        Memuat data…
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div><!-- /row -->
+
+</div><!-- /#appShell -->
+
+<!-- Toast Host -->
+<div id="toastHost" class="toast-host"></div>
+
+<!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+<script src="js/app.js"></script>
+<script src="js/sync.js"></script>
+<script>
+/**
+ * admisi.js — Admisi page logic (inline for clarity; can be extracted)
+ *
+ * Responsibilities:
+ *  1. Auth guard (redirect to login if not logged in)
+ *  2. Render sidebar shell
+ *  3. Load patient list via GET /api/pasien
+ *  4. Handle form submit via POST /api/pasien (fetch)
+ *  5. Handle consent toggle via PATCH /api/pasien/{id}/consent (fetch)
+ *  6. Search patients live
+ *  7. (Phase 4 prep) Detect offline mode — show notice on form
+ */
+(async function AdmisiPage() {
+    'use strict';
+
+    // ── 1. Auth Guard ─────────────────────────────────────────────────────────
+    const user = await App.requireAuth();
+    if (!user) return; // requireAuth already redirected
+
+    // ── 2. Render Sidebar ────────────────────────────────────────────────────
+    App.renderSidebar('admisi.html');
+
+    // ── 3. Wire CSRF refresh ──────────────────────────────────────────────────
+    await App.refreshCsrf();
+
+    // ── DOM Refs ──────────────────────────────────────────────────────────────
+    const tabelBody     = document.getElementById('tabelPasien');
+    const form          = document.getElementById('formAdmisi');
+    const btnDaftarkan  = document.getElementById('btnDaftarkan');
+    const btnDaftarText = document.getElementById('btnDaftarText');
+    const searchInput   = document.getElementById('searchInput');
+    const pageAlert     = document.getElementById('pageAlert');
+    const offlineNotice = document.getElementById('offlineModeNotice');
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function showAlert(msg, type = 'danger') {
+        pageAlert.className = `alert-simrs ${type} mb-3`;
+        pageAlert.innerHTML = msg;
+        pageAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    function clearAlert() {
+        pageAlert.className = 'd-none mb-3';
+        pageAlert.innerHTML = '';
+    }
+
+    function setFieldError(inputId, errorId, msg) {
+        const inp = document.getElementById(inputId);
+        const err = document.getElementById(errorId);
+        if (inp) inp.classList.add('is-invalid');
+        if (err) err.textContent = msg;
+    }
+    function clearFieldErrors() {
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
+    }
+
+    // ── 4. NIK counter & numeric guard ───────────────────────────────────────
+    const nikInput  = document.getElementById('nik');
+    const nikCount  = document.getElementById('nikCount');
+
+    nikInput.addEventListener('input', () => {
+        nikInput.value = nikInput.value.replace(/\D/g, '').slice(0, 16);
+        nikCount.textContent = String(nikInput.value.length);
+    });
+
+    // ── 5. Load Patient List ──────────────────────────────────────────────────
+    let allPatients = [];
+
+    async function loadPasien(q = '') {
+        // Spin the refresh icon
+        const refreshIcon = document.getElementById('refreshIcon');
+        refreshIcon?.classList.add('spin');
+
+        try {
+            const url = q ? `/pasien?q=${encodeURIComponent(q)}` : '/pasien';
+            const res  = await App.apiFetch(url);
+            const data = await res.json();
+
+            if (res.ok && data.ok) {
+                allPatients = data.data || [];
+            } else {
+                tabelBody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-4">
+                    Gagal memuat data: ${data.message || 'Error server'}</td></tr>`;
+            }
+        } catch (err) {
+            // Offline - fetch failed. allPatients will just rely on localDB below.
+        }
+
+        // --- Fetch Offline Queue and merge ---
+        try {
+            const offlineAdmisi = await LocalDB.getAdmisi();
+            const offlineMapped = offlineAdmisi.map(p => ({
+                id: 'local_' + p.id,
+                nik: p.nik,
+                nama: p.nama,
+                jenis_kelamin: p.jenis_kelamin,
+                tanggal_lahir: p.tanggal_lahir,
+                _is_offline: true
+            }));
+            
+            // Filter offline mapped based on search query 'q'
+            const filteredOffline = q ? offlineMapped.filter(p => 
+                p.nama.toLowerCase().includes(q.toLowerCase()) || 
+                p.nik.includes(q)
+            ) : offlineMapped;
+
+            allPatients = [...filteredOffline, ...allPatients];
+        } catch (e) {}
+
+        if (allPatients.length > 0) {
+            renderPasienTable(allPatients);
+        } else if (!navigator.onLine) {
+            tabelBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-4">
+                <i class="bi bi-cloud-slash me-2"></i>Mode Offline. Data kosong.</td></tr>`;
+        } else {
+            tabelBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-4">
+                Tidak ada data.</td></tr>`;
+        }
+        
+        if (refreshIcon) refreshIcon.classList.remove('spin');
+    }
+
+    function renderPasienTable(patients) {
+        if (!patients.length) {
+            tabelBody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-5">
+                <i class="bi bi-person-x d-block" style="font-size:2rem;margin-bottom:0.5rem;"></i>
+                Tidak ada data pasien.</td></tr>`;
+            return;
+        }
+
+        tabelBody.innerHTML = patients.map(p => {
+            const tglLahir = p.tanggal_lahir
+                ? new Date(p.tanggal_lahir).toLocaleDateString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric' })
+                : '-';
+            const consentChecked = parseInt(p.consent_satusehat) === 1;
+            const consentLabel   = consentChecked ? 'Aktif' : 'Ditolak';
+            const offlineBadge   = p._is_offline ? `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem;">Menunggu Upload</span>` : '';
+
+            return `
+            <tr data-id="${p.id}">
+                <td><code class="code-nik">${p.nik}</code></td>
+                <td>
+                    <div class="fw-semibold">${escHtml(p.nama)}${offlineBadge}</div>
+                    <div class="text-secondary" style="font-size:0.75rem;">
+                        ${p.jenis_kelamin === 'L' ? '♂ Laki-laki' : '♀ Perempuan'} · ${tglLahir}
+                    </div>
+                </td>
+                <td class="text-end">
+                    <a class="btn btn-outline-accent btn-sm" href="klinis.html?pasien_id=${p.id}"
+                       title="Buka form pemeriksaan klinis">
+                        <i class="bi bi-stethoscope"></i> Periksa
+                    </a>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── 6. Form Submit (POST /api/pasien) ─────────────────────────────────────
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearAlert();
+        clearFieldErrors();
+
+        const payload = {
+            nik:               document.getElementById('nik').value.trim(),
+            nama:              document.getElementById('nama').value.trim(),
+            jenis_kelamin:     document.getElementById('jenis_kelamin').value,
+            tanggal_lahir:     document.getElementById('tanggal_lahir').value,
+            ihs_number:        null,
+            consent_satusehat: true, // Default to true so it syncs to SatuSehat
+        };
+
+        // ── Client-side quick validation ──────────────────────────────────────
+        let hasError = false;
+        if (payload.nik.replace(/\D/g,'').length !== 16) {
+            setFieldError('nik', 'nikError', 'NIK harus tepat 16 digit angka.');
+            hasError = true;
+        }
+        if (!payload.nama) {
+            setFieldError('nama', 'namaError', 'Nama lengkap wajib diisi.');
+            hasError = true;
+        }
+        if (!payload.tanggal_lahir) {
+            hasError = true;
+            showAlert('Tanggal lahir wajib diisi.');
+        }
+        if (hasError) return;
+
+        // ── Loading state ─────────────────────────────────────────────────────
+        btnDaftarkan.disabled = true;
+        btnDaftarText.textContent = 'Menyimpan…';
+
+        // ── Offline Mode Save to IndexedDB (Tahap 4) ──────────────────────────
+        if (!navigator.onLine) {
+            try {
+                await LocalDB.saveAdmisi(payload);
+                await SyncManager.updateQueueUI();
+                App.toast('Data tersimpan lokal. Menunggu sinyal untuk upload.', 'warn');
+                showAlert('<i class="bi bi-wifi-off me-1"></i>Data tersimpan di antrean lokal karena sedang offline.', 'warning');
+                
+                form.reset();
+                nikCount.textContent = '0';
+                
+                // Refresh table to show the new offline patient
+                await loadPasien(searchInput.value.trim());
+            } catch (err) {
+                showAlert('<i class="bi bi-x-circle me-1"></i>Gagal menyimpan ke penyimpanan lokal.', 'danger');
+            } finally {
+                btnDaftarkan.disabled = false;
+                btnDaftarText.textContent = 'Daftarkan Pasien';
+            }
+            return;
+        }
+
+        try {
+            const res  = await App.apiFetch('/pasien', { method: 'POST', body: payload });
+            const data = await res.json();
+
+            if (res.status === 201 && data.ok) {
+                // ✅ Success
+                App.toast(`Pasien ${payload.nama} berhasil didaftarkan.`, 'success');
+                showAlert(
+                    `<i class="bi bi-check-circle me-1"></i>
+                     Pasien <strong>${escHtml(payload.nama)}</strong> berhasil didaftarkan
+                     (ID: ${data.pasien_id}).`,
+                    'success'
+                );
+                form.reset();
+                nikCount.textContent = '0';
+                document.getElementById('consent_satusehat').checked = true;
+                await loadPasien(); // Refresh table
+
+            } else if (res.status === 409) {
+                // NIK duplicate — harmless during sync
+                showAlert(
+                    `<i class="bi bi-info-circle me-1"></i>${data.message}`,
+                    'danger'
+                );
+                setFieldError('nik', 'nikError', 'NIK ini sudah terdaftar di sistem.');
+
+            } else if (res.status === 422 && data.messages) {
+                // Validation errors from server
+                Object.entries(data.messages).forEach(([field, msg]) => {
+                    const errorId = field + 'Error';
+                    setFieldError(field, errorId, msg);
+                });
+                showAlert('<i class="bi bi-exclamation-triangle me-1"></i>Periksa kembali data yang diisi.', 'danger');
+
+            } else {
+                showAlert(`<i class="bi bi-x-circle me-1"></i>${data.message || 'Terjadi kesalahan server.'}`, 'danger');
+            }
+
+        } catch (err) {
+            // ── Network error / offline ───────────────────────────────────────
+            // Phase 4 will handle IndexedDB queue here.
+            App.toast('Koneksi terputus — belum bisa menyimpan.', 'danger');
+            showAlert(
+                `<i class="bi bi-wifi-off me-1"></i>
+                 Tidak ada koneksi. Pada Tahap 4, data akan disimpan offline secara otomatis.`,
+                'danger'
+            );
+        } finally {
+            btnDaftarkan.disabled = false;
+            btnDaftarText.textContent = 'Daftarkan Pasien';
+        }
+    });
+
+    // ── 7. Consent Toggle (PATCH /api/pasien/{id}/consent) ───────────────────
+    tabelBody.addEventListener('change', async function (e) {
+        if (!e.target.classList.contains('js-consent')) return;
+
+        const id      = parseInt(e.target.dataset.id);
+        const consent = e.target.checked;
+        const label   = document.querySelector(`.js-consent-label[data-id="${id}"]`);
+
+        // Optimistic UI update
+        if (label) {
+            label.textContent = consent ? 'Aktif' : 'Ditolak';
+            label.style.color = consent ? 'var(--success)' : 'var(--danger)';
+        }
+
+        try {
+            const res  = await App.apiFetch(`/pasien/${id}/consent`, {
+                method: 'PATCH',
+                body: { consent },
+            });
+            const data = await res.json();
+
+            if (res.ok && data.ok) {
+                App.toast(
+                    consent ? 'Consent SATUSEHAT diaktifkan.' : 'Consent SATUSEHAT ditolak.',
+                    consent ? 'success' : 'warn'
+                );
+            } else {
+                // Revert on failure
+                e.target.checked = !consent;
+                if (label) {
+                    label.textContent = !consent ? 'Aktif' : 'Ditolak';
+                    label.style.color = !consent ? 'var(--success)' : 'var(--danger)';
+                }
+                App.toast(data.message || 'Gagal mengubah consent.', 'danger');
+            }
+        } catch (_) {
+            App.toast('Tidak ada koneksi — perubahan consent gagal disimpan.', 'danger');
+            // Revert on network error
+            e.target.checked = !consent;
+            if (label) {
+                label.textContent = !consent ? 'Aktif' : 'Ditolak';
+                label.style.color = !consent ? 'var(--success)' : 'var(--danger)';
+            }
+        }
+    });
+
+    // ── 8. Search ────────────────────────────────────────────────────────────
+    document.getElementById('btnSearch').addEventListener('click', () => {
+        loadPasien(searchInput.value.trim());
+    });
+
+    searchInput.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') loadPasien(searchInput.value.trim());
+    });
+
+    // Live search debounce (200ms)
+    let searchTimer;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadPasien(searchInput.value.trim()), 250);
+    });
+
+    document.getElementById('btnRefresh').addEventListener('click', () => {
+        searchInput.value = '';
+        loadPasien();
+    });
+
+    // ── 9. Offline mode notice ────────────────────────────────────────────────
+    function updateOfflineNotice() {
+        if (!navigator.onLine) {
+            offlineNotice?.classList.remove('d-none');
+        } else {
+            offlineNotice?.classList.add('d-none');
+        }
+    }
+    updateOfflineNotice();
+    window.addEventListener('online',  updateOfflineNotice);
+    window.addEventListener('offline', updateOfflineNotice);
+
+    // ── 10. Initial data load ────────────────────────────────────────────────
+    // Pre-fill search from URL param e.g. admisi.html?q=Budi
+    const urlQ = new URLSearchParams(window.location.search).get('q') || '';
+    if (urlQ) searchInput.value = urlQ;
+    await loadPasien(urlQ);
+
+})();
+
+/* ── Utility: safe HTML escape ────────────────────────────────────────────── */
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+RewriteEngine On
+
+# ── REST API: Route /api/* → api/index.php ──────────────────────────────────
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+
+# ── App SSR: Route everything else → index.php ──────────────────────────────
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]

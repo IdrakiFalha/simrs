@@ -1,0 +1,42 @@
+{
+  "name": "SIMRS RSUD Meuraxa",
+  "short_name": "SIMRS",
+  "description": "Sistem Informasi Manajemen Rumah Sakit — SATUSEHAT FHIR R4 · NEWS2 · Offline-First",
+  "start_url": "./login.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#00c9a7",
+  "background_color": "#0b0f19",
+  "lang": "id",
+  "categories": ["medical", "health", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Admisi Pasien",
+      "short_name": "Admisi",
+      "url": "./admisi.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pemeriksaan Klinis",
+      "short_name": "Klinis",
+      "url": "./klinis.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemeriksaan Klinis — RSUD Meuraxa SIMRS</title>
+    <meta name="description" content="Form pemeriksaan klinis, keluhan, diagnosa, dan resep obat">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00c9a7">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/app.css" rel="stylesheet">
+
+    <style>
+        /* ── Resep row ── */
+        .resep-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .resep-row:last-child { border-bottom: none; }
+
+        /* ── Obat autocomplete dropdown ── */
+        .obat-dropdown {
+            position: absolute;
+            z-index: 1000;
+            width: 100%;
+            max-height: 220px;
+            overflow-y: auto;
+            background: rgba(17, 24, 39, 0.97);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+            margin-top: 2px;
+        }
+        .obat-option {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            font-size: 0.88rem;
+            transition: var(--transition);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .obat-option:hover,
+        .obat-option.active { background: rgba(0,201,167,0.12); color: var(--accent); }
+        .obat-option:last-child { border-bottom: none; }
+        .obat-option small { color: var(--text-muted); font-size: 0.75rem; }
+    </style>
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+    <!-- ── Patient Header ─────────────────────────────────────────────────── -->
+    <div id="pasienHeader" class="glass-card p-3 mb-4 d-flex align-items-center gap-3">
+        <div class="spinner-border spinner-border-sm text-secondary"></div>
+        <span class="text-secondary">Memuat data pasien…</span>
+    </div>
+
+    <div id="privacyNotice" class="d-none alert-simrs danger mb-4">
+        <i class="bi bi-shield-exclamation me-1"></i>
+        <strong>Perhatian:</strong> Pasien ini belum memberikan izin (consent) SATUSEHAT.
+        Data pemeriksaan tetap tersimpan di sistem lokal, namun <strong>tidak akan dikirim</strong> ke SATUSEHAT Kemenkes.
+    </div>
+
+    <!-- ── Offline Mode Notice ─────────────────────────────────────────────── -->
+    <div id="offlineFormNotice" class="d-none alert-simrs danger mb-3" style="border-left:4px solid var(--warning);background:rgba(245,158,11,0.1);color:#fef3c7;">
+        <i class="bi bi-wifi-off me-1"></i>
+        <strong>Mode Offline</strong> — Data akan tersimpan di antrian lokal dan dikirim otomatis saat koneksi internet pulih.
+    </div>
+
+    <!-- ══ FORM KLINIS (single scroll, friendly UI) ════════════════════════════════════════ -->
+    <form id="formKlinis" novalidate>
+
+        <div class="row g-4">
+            <!-- ── ATAS: Tanda Vital ──────────────────────────────── -->
+            <div class="col-lg-5">
+                <div class="glass-card h-100">
+                    <div class="card-header-custom">
+                        <h5><i class="bi bi-heart-pulse me-2"></i>Tanda Vital Dasar</h5>
+                    </div>
+                    <div class="card-body">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold mb-1" for="sistole">Tekanan Darah (Sistole)</label>
+                            <div class="input-group input-group-lg">
+                                <input class="form-control" id="sistole" name="sistole" type="number" min="40" max="300" placeholder="Contoh: 120" inputmode="numeric">
+                                <span class="input-group-text text-muted" style="font-size: 0.9rem;">mmHg</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold mb-1" for="diastole">Tekanan Darah (Diastole)</label>
+                            <div class="input-group input-group-lg">
+                                <input class="form-control" id="diastole" name="diastole" type="number" min="20" max="200" placeholder="Contoh: 80" inputmode="numeric">
+                                <span class="input-group-text text-muted" style="font-size: 0.9rem;">mmHg</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold mb-1" for="nadi">Nadi / Detak Jantung</label>
+                            <div class="input-group input-group-lg">
+                                <input class="form-control" id="nadi" name="nadi" type="number" min="20" max="250" placeholder="Contoh: 80" inputmode="numeric">
+                                <span class="input-group-text text-muted" style="font-size: 0.9rem;">x / mnt</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold mb-1" for="suhu">Suhu Tubuh</label>
+                            <div class="input-group input-group-lg">
+                                <input class="form-control" id="suhu" name="suhu" type="number" min="30" max="45" step="0.1" placeholder="Contoh: 36.5" inputmode="decimal">
+                                <span class="input-group-text text-muted" style="font-size: 0.9rem;">°C</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-1" for="laju_napas">Pernapasan</label>
+                            <div class="input-group input-group-lg">
+                                <input class="form-control" id="laju_napas" name="laju_napas" type="number" min="4" max="60" placeholder="Contoh: 20" inputmode="numeric">
+                                <span class="input-group-text text-muted" style="font-size: 0.9rem;">x / mnt</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── BAWAH: Klinis + Resep ───────────────────────────────────── -->
+            <div class="col-lg-7 d-flex flex-column gap-4">
+
+                <!-- Keluhan & Diagnosa -->
+                <div class="glass-card">
+                    <div class="card-header-custom">
+                        <h5><i class="bi bi-journal-medical me-2"></i>Pemeriksaan</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-1" for="keluhan">Keluhan Utama Pasien</label>
+                            <textarea class="form-control form-control-lg" id="keluhan" name="keluhan"
+                                      rows="3" placeholder="Tuliskan apa yang dikeluhkan pasien saat ini…" maxlength="500"></textarea>
+                        </div>
+                        <div>
+                            <label class="form-label fw-bold mb-1" for="diagnosa_icd10">
+                                Diagnosa Penyakit
+                                <span class="fw-normal" style="font-size:0.85rem;">(Kode ICD-10)</span>
+                            </label>
+                            <input class="form-control form-control-lg" id="diagnosa_icd10" name="diagnosa_icd10"
+                                   placeholder="Contoh: J06.9 (ISPA)" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resep Obat -->
+                <div class="glass-card">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-capsule me-2"></i>Resep Obat</h5>
+                        <button type="button" class="btn btn-outline-accent" id="btnAddObat">
+                            <i class="bi bi-plus"></i> Tambah Obat
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="resepRows">
+                            <!-- Rows injected by JS -->
+                        </div>
+                        <p id="resepEmpty" class="text-muted text-center py-4 mb-0" style="font-size:0.95rem;">
+                            <i class="bi bi-capsule d-block mb-2" style="font-size: 1.5rem; opacity: 0.5;"></i>
+                            Belum ada obat yang ditambahkan.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div><!-- /row -->
+
+        <!-- ── Submit ──────────────────────────────────────────────────────── -->
+        <div class="mt-4 glass-card p-3 d-flex gap-3 align-items-center flex-wrap" style="background: rgba(0, 201, 167, 0.05);">
+            <button class="btn btn-accent btn-lg px-5 fw-bold" type="submit" id="btnSimpan">
+                <i class="bi bi-save2 me-2"></i>
+                <span id="btnSimpanText">Simpan Pemeriksaan</span>
+            </button>
+            <a href="admisi.html" class="btn btn-ghost btn-lg">
+                <i class="bi bi-arrow-left me-1"></i>Kembali
+            </a>
+            <span id="submitStatus" class="ms-auto fw-bold" style="font-size:0.95rem;"></span>
+        </div>
+
+    </form>
+
+</div><!-- /#appShell -->
+
+<div id="toastHost" class="toast-host"></div>
+<script src="js/app.js"></script>
+<script src="js/sync.js"></script>
+<script>
+/**
+ * klinis.js — Clinical Examination Page
+ * Friendly UI version: No foreign medical scores, large inputs, robust offline caching.
+ */
+(async function KlinisPage() {
+    'use strict';
+
+    // ── Auth & Sidebar ────────────────────────────────────────────────────────
+    const user = await App.requireAuth();
+    if (!user) return;
+    App.renderSidebar('klinis.html');
+    await App.refreshCsrf();
+
+    // ── Get pasien_id from URL ─────────────────────────────────────────────────
+    const params   = new URLSearchParams(window.location.search);
+    const pasienIdRaw = params.get('pasien_id');
+    const isLocal = pasienIdRaw && pasienIdRaw.startsWith('local_');
+    const pasienId = isLocal ? parseInt(pasienIdRaw.replace('local_', '')) : parseInt(pasienIdRaw || '0');
+
+    if (!pasienId) {
+        document.getElementById('pasienHeader').innerHTML = `
+            <div class="alert-simrs danger w-100">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Pilih pasien terlebih dahulu. <a href="admisi.html" class="text-accent fw-bold ms-2">← Kembali ke Antrean</a>
+            </div>`;
+        return;
+    }
+
+    // ── 1. Load Patient Data ──────────────────────────────────────────────────
+    let pasien = null;
+    try {
+        if (isLocal) {
+            const admisiList = await LocalDB.getAdmisi();
+            pasien = admisiList.find(p => p.id === pasienId);
+            if (!pasien) throw new Error('Data Pasien tidak ditemukan di antrean lokal.');
+        } else {
+            const res  = await App.apiFetch(`/pasien?pasien_id=${pasienId}`);
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Data Pasien tidak ditemukan');
+            pasien = data.pasien;
+        }
+    } catch (err) {
+        document.getElementById('pasienHeader').innerHTML = `
+            <div class="alert-simrs danger w-100">
+                <i class="bi bi-x-circle me-1"></i>
+                ${err.message} — <a href="admisi.html" class="text-accent fw-bold ms-2">← Kembali</a>
+            </div>`;
+        return;
+    }
+
+    // ── Render patient header ──────────────────────────────────────────────────
+    const tglLahir = pasien.tanggal_lahir
+        ? new Date(pasien.tanggal_lahir).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })
+        : '-';
+    const umur = pasien.tanggal_lahir
+        ? Math.floor((Date.now() - new Date(pasien.tanggal_lahir)) / 3.15576e10) + ' th'
+        : '-';
+
+    document.getElementById('pasienHeader').innerHTML = `
+        <div class="avatar" style="width:56px;height:56px;border-radius:50%;
+             background:linear-gradient(135deg,var(--accent),var(--primary-blue));
+             display:flex;align-items:center;justify-content:center;
+             font-weight:900;font-size:1.6rem;color:#000;flex-shrink:0;">
+            ${pasien.nama.charAt(0).toUpperCase()}
+        </div>
+        <div class="flex-grow-1">
+            <div class="fw-bold" style="font-size:1.2rem;">${escHtml(pasien.nama)}</div>
+            <div class="text-secondary" style="font-size:0.95rem;">
+                NIK: <code class="code-nik">${pasien.nik}</code> &nbsp;·&nbsp;
+                ${pasien.jenis_kelamin === 'L' ? '♂' : '♀'} ${umur} &nbsp;·&nbsp; ${tglLahir}
+            </div>
+        </div>
+        </div>`;
+
+
+    // ── 2. Offline Mode Notice ─────────────────────────────────────────────────
+    function updateOfflineNotice() {
+        document.getElementById('offlineFormNotice').classList.toggle('d-none', navigator.onLine);
+    }
+    updateOfflineNotice();
+    window.addEventListener('online',  updateOfflineNotice);
+    window.addEventListener('offline', updateOfflineNotice);
+
+    // ── 3. Resep Management ───────────────────────────────────────────────────
+    let resepList  = [];   // { obat_id, nama_obat, aturan_pakai }
+    let obatCache  = [];   // full drug list for autocomplete
+
+    // Fetch drug list for autocomplete (caching)
+    try {
+        const res  = await App.apiFetch('/farmasi/obat');
+        const data = await res.json();
+        if (data.ok) obatCache = data.data;
+    } catch (_) {
+        // Offline - relies on fallback logic in search
+    }
+
+    function renderResepRows() {
+        const rows = document.getElementById('resepRows');
+        const empty = document.getElementById('resepEmpty');
+
+        empty.classList.toggle('d-none', resepList.length > 0);
+
+        rows.innerHTML = resepList.map((item, idx) => `
+        <div class="resep-row" data-idx="${idx}">
+            <div>
+                <div class="fw-bold text-accent" style="font-size:1.05rem;">${escHtml(item.nama_obat)}</div>
+                <input class="form-control mt-2 js-aturan"
+                       data-idx="${idx}"
+                       value="${escHtml(item.aturan_pakai)}"
+                       placeholder="Aturan pakai (contoh: 3x1 sesudah makan)">
+            </div>
+            <button type="button" class="btn btn-ghost js-del-obat" data-idx="${idx}"
+                    title="Hapus Obat" style="color:var(--danger); font-size:1.2rem;">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+        </div>`).join('');
+
+        // Wire aturan input changes
+        rows.querySelectorAll('.js-aturan').forEach(inp => {
+            inp.addEventListener('input', ev => {
+                const i = parseInt(ev.target.dataset.idx);
+                if (resepList[i]) resepList[i].aturan_pakai = ev.target.value;
+            });
+        });
+
+        // Wire delete buttons
+        rows.querySelectorAll('.js-del-obat').forEach(btn => {
+            btn.addEventListener('click', ev => {
+                const i = parseInt(ev.currentTarget.dataset.idx);
+                resepList.splice(i, 1);
+                renderResepRows();
+            });
+        });
+    }
+
+    // Drug autocomplete search
+    function buildObatSearchRow() {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'position-relative mb-3';
+        wrapper.innerHTML = `
+            <input class="form-control form-control-lg border-accent" type="search"
+                   placeholder="Ketik nama obat…"
+                   autocomplete="off"
+                   id="obatSearchInput_${Date.now()}">
+            <div class="obat-dropdown d-none" id="obatDropdown_temp"></div>`;
+
+        const inp = wrapper.querySelector('input');
+        const dd  = wrapper.querySelector('.obat-dropdown');
+
+        let debounce;
+        inp.addEventListener('input', () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(async () => {
+                const q = inp.value.trim();
+                if (!q) { dd.classList.add('d-none'); return; }
+
+                // Filter local cache first
+                let results = obatCache.filter(o =>
+                    o.nama_obat.toLowerCase().includes(q.toLowerCase()) ||
+                    (o.kode_kfa || '').toLowerCase().includes(q.toLowerCase())
+                ).slice(0, 10);
+
+                if (!results.length && navigator.onLine) {
+                    try {
+                        const res  = await App.apiFetch(`/obat?q=${encodeURIComponent(q)}`);
+                        const data = await res.json();
+                        if (data.ok) results = data.data.slice(0, 10);
+                    } catch (_) {}
+                }
+
+                if (!results.length) {
+                    dd.innerHTML = `<div class="obat-option text-muted">Obat tidak ditemukan</div>`;
+                } else {
+                    dd.innerHTML = results.map(o => `
+                        <div class="obat-option" data-id="${o.id}" data-nama="${escHtml(o.nama_obat)}">
+                            <span class="fw-bold">${escHtml(o.nama_obat)}</span>
+                            <small class="d-block">${o.kandungan_aktif || ''}</small>
+                        </div>`).join('');
+
+                    dd.querySelectorAll('.obat-option').forEach(opt => {
+                        opt.addEventListener('mousedown', ev => {
+                            ev.preventDefault();
+                            const id   = parseInt(opt.dataset.id);
+                            const nama = opt.dataset.nama;
+                            resepList.push({ obat_id: id, nama_obat: nama, aturan_pakai: '' });
+                            renderResepRows();
+                            wrapper.remove();
+                        });
+                    });
+                }
+
+                dd.classList.remove('d-none');
+            }, 200);
+        });
+
+        inp.addEventListener('blur', () => {
+            setTimeout(() => dd.classList.add('d-none'), 150);
+        });
+
+        return wrapper;
+    }
+
+    document.getElementById('btnAddObat').addEventListener('click', () => {
+        const rows = document.getElementById('resepRows');
+        rows.appendChild(buildObatSearchRow());
+        rows.querySelector('input')?.focus();
+    });
+
+    // ── 4. Form Submit (POST /api/kunjungan) ──────────────────────────────────
+    const form      = document.getElementById('formKlinis');
+    const btnSimpan = document.getElementById('btnSimpan');
+    const btnText   = document.getElementById('btnSimpanText');
+    const status    = document.getElementById('submitStatus');
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        status.textContent = '';
+
+        const vitals = {
+            sistole:    parseInt(document.getElementById('sistole').value)       || 0,
+            diastole:   parseInt(document.getElementById('diastole').value)      || 0,
+            nadi:       parseInt(document.getElementById('nadi').value)          || 0,
+            suhu:       parseFloat(document.getElementById('suhu').value)        || 0,
+            laju_napas: parseInt(document.getElementById('laju_napas').value)    || 0,
+        };
+
+        const payload = {
+            pasien_id:      isLocal ? pasienIdRaw : pasienId,
+            ...vitals,
+            keluhan:        document.getElementById('keluhan').value.trim(),
+            diagnosa_icd10: document.getElementById('diagnosa_icd10').value.trim(),
+            resep:          resepList.map(r => ({ obat_id: r.obat_id, aturan_pakai: r.aturan_pakai })),
+        };
+
+        btnSimpan.disabled = true;
+        btnText.textContent = 'Menyimpan…';
+
+        // ── Offline Mode Save to IndexedDB (Tahap 4) ──────────────────────────
+        if (!navigator.onLine) {
+            try {
+                await LocalDB.saveKlinis(payload);
+                await SyncManager.updateQueueUI();
+                App.toast('Disimpan secara offline.', 'warn');
+                status.innerHTML = `<span style="color:var(--warning);">
+                    <i class="bi bi-cloud-arrow-down-fill me-1"></i>
+                    Tersimpan di antrean lokal.</span>`;
+                
+                form.querySelectorAll('input:not(#sistole), textarea').forEach(el => el.value = '');
+                document.getElementById('sistole').value = '';
+                document.getElementById('diastole').value = '';
+                document.getElementById('nadi').value = '';
+                document.getElementById('suhu').value = '';
+                document.getElementById('laju_napas').value = '';
+                resepList = [];
+                renderResepRows();
+            } catch(e) {
+                App.toast('Gagal menyimpan.', 'danger');
+            } finally {
+                btnSimpan.disabled = false;
+                btnText.textContent = 'Simpan Pemeriksaan';
+            }
+            return;
+        }
+
+        try {
+            const res  = await App.apiFetch('/kunjungan', { method: 'POST', body: payload });
+            const data = await res.json();
+
+            if (res.status === 201 && data.ok) {
+                // ✅ Berhasil
+                const ss = data.satusehat;
+                const ssMsg = ss.pushed
+                    ? `SATUSEHAT ✅`
+                    : `SATUSEHAT ❌`;
+
+                App.toast(`Data Pemeriksaan Berhasil Disimpan!`, 'success', 4000);
+                status.innerHTML = `
+                    <span style="color:var(--success);">
+                        <i class="bi bi-check-circle-fill me-1"></i>
+                        Berhasil Disimpan! &nbsp;|&nbsp; ${ssMsg}
+                    </span>`;
+
+                form.querySelectorAll('input:not(#sistole), textarea').forEach(el => el.value = '');
+                document.getElementById('sistole').value = '';
+                document.getElementById('diastole').value = '';
+                document.getElementById('nadi').value = '';
+                document.getElementById('suhu').value = '';
+                document.getElementById('laju_napas').value = '';
+                resepList = [];
+                renderResepRows();
+
+            } else {
+                App.toast(data.message || 'Gagal menyimpan.', 'danger');
+                status.innerHTML = `<span style="color:var(--danger);">
+                    <i class="bi bi-x-circle me-1"></i>Gagal Menyimpan</span>`;
+            }
+
+        } catch (err) {
+            App.toast('Koneksi terputus saat menyimpan.', 'danger');
+            status.innerHTML = `<span style="color:var(--warning);">
+                <i class="bi bi-wifi-off me-1"></i>
+                Mode offline — data tersimpan ke lokal.</span>`;
+        } finally {
+            btnSimpan.disabled = false;
+            btnText.textContent = 'Simpan Pemeriksaan';
+        }
+    });
+
+    // Initial render
+    renderResepRows();
+
+})();
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
